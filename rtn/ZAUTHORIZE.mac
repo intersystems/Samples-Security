@@ -1,0 +1,215 @@
+ROUTINE ZAUTHORIZE
+ZAUTHORIZE(ServiceName,Namespace,Username,Password,Credentials,Properties) PUBLIC {
+ /* The line above this (containing the ZAUTHORIZE tag) must be 
+ the first line in the routine. */
+#;This is from https://github.com/intersystems/Samples-Security
+#;Use or operation of this code is subject to acceptance of the license available in the code 
+#;repository for this code.
+#;*=======================Maintenance========================*/
+#;When updating the history, please update the following line so that
+#;the last change # and date appear in the .INT code on the users system
+.
+ /* Last update STC2090, 05/21/12 */
+.
+#;STC2090 05/21/12 Steve Clay, Move routine to SAMPLES namespace
+#;STC1582 04/21/09 Steve Clay, Initial version
+#;*=====================End Maintenance========================*/
+.
+ 
+ /* 
+ This entry point is called when a process has already been authenticated
+ by the system, and the option to use delegated authorization has been selected.
+ This means that we wish to use some external means to set the
+ roles for the user logging in.
+    
+ Typical useage here would be to take the Username passed in as a parameter, and
+ use it to look up the users roles in some external database (such as LDAP), and
+ then returning the roles in the Properties array.
+ 
+ This function is called when delegated authorization is selected for
+ user authorization. If the end-user wishes to implement their own 
+ authorization module, they need to modify this code and implement
+ their own authorization method here. The authorization method can be 
+ any user written COS code, class method, or $zf callout.
+ 
+ To use this routine as a template, you must first move it to the %SYS namespace
+ and edit it there as .MAC code. Note that MAC code is preserved between upgrades.
+ 
+ If you wish to examine the current version of this routine which InterSystems
+ ships, it can be found in the SAMPLES namespace. Note that you should examine the
+ current version of the routine routine before you upgrade to a new version to 
+ determine if you need to make any changes to it to support new functionality.
+ 
+ If the user is successfully authorized, the Cache security database is updated
+ in one of the following ways:
+ 
+ 1) If this is the first time the user has logged in, a user record is created
+ in the security database for the entered username, using properties returned
+ by this function.
+ 
+ 2) If the user has logged in before, the user record is updated in the security
+ database for the entered user, using properties returned by this function.
+ 
+ In either case, the process which logs in has its roles ($ROLES) set
+ to the value of Properties("Roles"). If they are executing a terminal login,
+ then the namespace and startup routine are set to Properties("NameSpace") and 
+ Properties("Routine").
+ 
+ Parameters:
+  ServiceName - Name of the service the user is connecting to. This 
+                could be %Service_Console, %Service_CSP, etc.
+  Namespace - Namespace specified as part of the connection string when connecting
+              via the Bindings service. If not the Bindings service, passed in as "".
+  Username - Username entered by the user to be validated by the 
+             user written code.
+  Password - Password entered by the user to be validated by the
+             user written code. Note that the password parameter would only be 
+             passed in if using kerberos K5API authentication (otherwise "")
+  Credentials - Not currently used, reserved for future use.
+  Properties - Array of returned values, passed by reference
+ 
+ 
+ Return values:
+  Success - $SYSTEM.Status.OK() - Username/Password combination authenticated ok
+  Failure - $SYSTEM.Status.Error($$$ERRORCODE,Param1,...) - Username/Password combination 
+            did not authenticate ok
+ 
+ Here are a list of predefined error code which can be returned, or you
+ can generate your own errors. If you wish to use these error codes
+ in your routine, you must uncomment out the %occErrors include statement below.
+ 
+ $SYSTEM.Status.Error($$$AccessDenied)                           Access Denied
+ $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)              Invalid Username or Password
+ $SYSTEM.Status.Error($$$UserNotAuthorizedOnSystem,Username)     User x is not authorized
+ $SYSTEM.Status.Error($$$UserAccountIsDisabled,Username)         User x account is disabled
+ $SYSTEM.Status.Error($$$UserInvalidUsernameOrPassword,Username) User x invalid name or password
+ $SYSTEM.Status.Error($$$UserLoginTimeout)                       Login timeout
+ $SYSTEM.Status.Error($$$UserCTRLC)                              Login aborted
+ $SYSTEM.Status.Error($$$UserDoesNotExist,Username)              User x does not exist
+ $SYSTEM.Status.Error($$$UserInvalid,Username)                   Username x is invalid
+ $SYSTEM.Status.Error($$$PasswordChangeRequired)                 Password change required
+ $SYSTEM.Status.Error($$$UserAccountIsExpired,Username)          User x account has expired
+ $SYSTEM.Status.Error($$$UserAccountIsInactive,Username)         User x account is inactive
+ $SYSTEM.Status.Error($$$UserInvalidPassword)                    Invalid password
+ $SYSTEM.Status.Error($$$ServiceDisabled,ServiceName)            Logins for Service x are disabled
+ $SYSTEM.Status.Error($$$ServiceLoginsDisabled)                  Logins are disabled
+ $SYSTEM.Status.Error($$$ServiceNotAuthorized,ServiceName)       User not authorized for service
+ 
+ If you wish to generate your own custom message, you can use the following:
+ 
+ $SYSTEM.Status.Error($$$GeneralError,"Any text here")
+ 
+ Note that when an error message is returned to the caller, it is logged in
+ the audit database (if LoginFailure event auditing is turned on.) However,
+ the only error message the user sees is $SYSTEM.Status.Error($$$AccessDenied). 
+ 
+ On Success, the user can return any or none of the following user properties. 
+ These are used to create or update the user record in the Cache security database
+ for reporting purposes.
+ 
+ The Roles, NameSpace, and Routine variables are also used to set the value of
+ $ROLES for the process in addition to the startup namespace and routine 
+ for terminal access.
+ 
+ Properties() - Array of user properties passed by reference (see notes below):
+   Properties("Comment") - Comment
+   Properties("FullName") - Full name of the user
+   Properties("NameSpace") - Default NameSpace for terminal login, e.g. "USER"
+                             NameSpace = "" means use "USER" or "%SYS"
+   Properties("Roles")- Comma-separated list of roles, e.g. "%Developer,%Operator"
+   Properties("Routine") - Routine the user runs for terminal access. 
+                           Routine="" means programmer mode
+   Properties("Password") - Password
+   Properties("Username") - Username
+ 
+ Notes:
+ 
+ Comment - If the comment property is returned by this function, then that comment
+ is written to the Cache database for the user. If the comment property is not passed 
+ back to the calling routine, then the comment written to the Cache security database
+ will be a null string. Any Cache displays in the system management portal which 
+ examine this field will display a null string.
+ 
+ FullName - If the FullName property is returned by this function, then that FullName
+ is written to the Cache database for the user. If the FullName property is not passed 
+ back to the calling routine, then the FullName written to the Cache security database
+ will be a null string. Any Cache displays in the system management portal which 
+ examine this field will display a null string.
+ 
+ NameSpace - If the NameSpace property is returned by this function, then that NameSpace
+ is written to the Cache database for the user, and any terminal user (telnet, console, etc.)
+ logging into the system will get this namespace as their default namespace. If the 
+ NameSpace property is not passed back to the calling routine, then the NameSpace
+ written to the Cache security database will be a null string. Any terminal user logging into
+ the system with a null namespace will have the following actions:
+ 
+ 1) If the USER namespace exists, the user will be placed in the USER namespace.
+ 2) If the USER namespace does not exist, the user will be placed in the %SYS namespace.
+ 
+ In either case, if the user does not have privilege to be in that namespace, then 
+ the user will be denied access to the system.
+ 
+ Password -  If the password is returned
+ by this function, then it is stored in the security database for the user.
+ This would allow the user to use this password to log into the system using
+ Password authentication if it were enabled. This is a possible mechanism to
+ help migrate from delegated authentication to Password authentication.
+ 
+ Roles - If the Roles property is returned by this function, then those Roles
+ are written to the Cache database for the user, and any user 
+ logging into the system will be granted those roles. If the Roles property is not passed 
+ back to the calling routine, then the Roles written to the Cache security database
+ will be a null string. Setting the Roles to "", or not returning it means that a user 
+ logging into the system will not receive any roles from the user written routine. Their set of 
+ privileges will be governed by what roles they get from the _Public user, and what 
+ resources are set to public.
+ NOTE: If the role(s) returned in the Properties("Roles") parameter are not 
+ defined in the Security database, then the role will not be granted to the user.
+ 
+ Routine - If the Routine property is returned by this function, then that Routine
+ is written to the Cache database for the user, and any terminal user (telnet, console, etc.)
+ logging into the system will execute that routine. If the Routine property is not passed 
+ back to the calling routine, then the routine written to the Cache security database
+ will be a null string. Setting the Routine to "", or not returning it means that a terminal
+ user will enter Cache in programmer mode, subject to whether they have the privilege to
+ access programmer mode or not.
+ 
+ Username -  If the username property is returned by this function, then that username
+ is written to the Cache database. This gives the user a chance to normalize what was 
+ entered by the user at the username prompt. Note that the normalized username must only
+ differ by case. If the Username property is not passed back to the calling routine,
+ then the username entered by the user at the username prompt will be used as
+ the username written to the Cache security databases (i.e. it won't be normalized).
+*/
+ 
+ //Uncomment out the following line if you wish to use the predefined
+ //Cache error codes.
+ 
+ //#include %occErrors
+ 
+ //Make sure we have an error trap to handle unexpected errors
+ s $ZT="Error"
+.
+ /* At this point, the process has already been authenticated. We
+ can do anything we want to here to get our roles, including contacting an 
+ LDAP server, looking in a global, using a web service, etc.
+ */
+.
+ // s Properties("Roles")="%Developer"
+ 
+ //Return success. For the sample routine, we will actually generate an
+ //error here so we don't get any successfull logins if this is turned on
+ //by accident.
+ s $ZE="No ZAUTHORIZE routine found" g Error
+ q $SYSTEM.Status.OK()
+Error //Handle any COS errors here
+ //Reset error trap to avoid infinite loop
+ s $zt=""
+ //Return the generalized COS error message #5002
+ q $SYSTEM.Status.Error(5002 /*$$$CacheError*/,$ze)
+ 
+}
+.
+
+
+

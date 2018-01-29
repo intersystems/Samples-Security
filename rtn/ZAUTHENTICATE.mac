@@ -1,0 +1,705 @@
+ROUTINE ZAUTHENTICATE
+ZAUTHENTICATE(ServiceName,Namespace,Username,Password,Credentials,Properties) PUBLIC {
+ /* The line above this (containing the ZAUTHENTICATE tag) must be 
+ the first line in the routine. No include files, documentation or anything else 
+ before this line.*/
+ /*
+#;This is from https://github.com/intersystems/Samples-Security
+#;Use or operation of this code is subject to acceptance of the license available in the code 
+#;repository for this code.
+#;*=======================Maintenance========================*/
+#;When updating the history, please update the following line so that
+#;the last change # and date appear in the .INT code on the users system
+ 
+ /* Last update RJW2213 11/20/14 */
+ 
+#;RJW2213 11/21/14 Ron Watt, Create "RunAs" facility for Cache processes on Windows.
+#;STC2346 09/30/14 Steve Clay, Disabling Two Factor authentication for unconfigured users now works
+#;STC2276 04/03/14 Steve Clay, Delegated authentication can now override two factor authentication
+#;STC2173 01/29/13 Steve Clay, Delegated authentication now supports two-factor authentication 
+#;STC2090 05/21/12 Steve Clay, Move routine to SAMPLES namespace
+#;STC1976 08/24/11 Steve Clay, Updated documentation about value of $ROLES
+#;STC1795 09/14/10 Steve Clay, Allow use of ZAUTHENTICATE for credentials
+#;STC1744 01/20/10 Steve Clay, Handle change password better for Delegated authentication
+#;STC1721 12/10/09 Steve Clay, Don't cascade authentication if password change requested
+#;STC1630 07/10/09 Steve clay  More documentation
+#;STC1582 04/21/09 Steve Clay, Add Credentials parameter
+#;STC1549 03/12/09 Steve Clay, Add Copyright to ZAUTHENTICATE routine 
+#;STC1530 01/27/09 Steve Clay, Add namespace parameter to Delegated authentication 
+#;STC983 05/01/06 Steve Clay, Initial version
+#;*=====================End Maintenance========================*/
+ /*
+ This function is called when delegated authentication is selected for
+ user authentication. If the end-user wishes to implement their own 
+ authentication module, they need to modify this code and implement
+ their own authentication method here. The authentication method can be 
+ any user written COS code, class method, or $zf callout.
+ 
+ Note that when this routine is called, the process will have been temporarily
+ granted the %All role, and the value of $ROLES will include this. This gives the 
+ ZAUTHENTICATE routine access to any resource controlled by the system.
+ 
+ To use this routine as a template, you must first move it to the %SYS namespace
+ and edit it there as .MAC code. Note that MAC code is preserved between upgrades.
+ 
+ If you wish to examine the current version of this routine which InterSystems
+ ships, it can be found in the SAMPLES namespace. Note that you should examine the
+ current version of the routine before you upgrade to a new version to 
+ determine if you need to make any changes to it to support new functionality.
+ 
+ If the user is successfully authenticated, the Cache security database is updated
+ in one of the following ways:
+ 
+ 1) If this is the first time the user has logged in, a user record is created
+ in the security database for the entered username, using properties returned
+ by this function.
+ 
+ 2) If the user has logged in before, the user record is updated in the security
+ database for the entered user, using properties returned by this function.
+ 
+ 3) Login information is updated for the user including last login data and time, and
+ the invalid login attempts counter is set to 0.
+ 
+ In either case, the process which logs in has its roles ($ROLES) set
+ to the value of Properties("Roles"). If they are executing a terminal login,
+ then the namespace and startup routine are set to Properties("NameSpace") and 
+ Properties("Routine").
+ 
+ Parameters:
+  ServiceName - Name of the service the user is connecting to. This 
+                could be %Service_Console, %Service_Bindings, etc.
+  Namespace - Namespace specified as part of the connection string when connecting
+              via the Bindings service, or through a CSP application. If neither of these, then
+              passed in as "".
+  Username - Username entered by the user to be validated by the 
+             user written code.
+  Password - Password entered by the user to be validated by the
+             user written code
+  Credentials - Not currently used, reserved for future use.
+  Properties - Array of returned values, passed by reference
+ 
+ 
+ Return values:
+  Success - $SYSTEM.Status.OK() - Username/Password combination authenticated ok
+  Failure - $SYSTEM.Status.Error($$$ERRORCODE,Param1,...) - Username/Password combination 
+            did not authenticate ok
+ 
+ Here are a list of predefined error code which can be returned, or you
+ can generate your own errors. If you wish to use these error codes
+ in your routine, you must uncomment out the %occErrors include statement below.
+ 
+ $SYSTEM.Status.Error($$$AccessDenied)                           Access Denied
+ $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)              Invalid Username or Password
+ $SYSTEM.Status.Error($$$UserNotAuthorizedOnSystem,Username)     User x is not authorized
+ $SYSTEM.Status.Error($$$UserAccountIsDisabled,Username)         User x account is disabled
+ $SYSTEM.Status.Error($$$UserInvalidUsernameOrPassword,Username) User x invalid name or password
+ $SYSTEM.Status.Error($$$UserLoginTimeout)                       Login timeout
+ $SYSTEM.Status.Error($$$UserCTRLC)                              Login aborted
+ $SYSTEM.Status.Error($$$UserDoesNotExist,Username)              User x does not exist
+ $SYSTEM.Status.Error($$$UserInvalid,Username)                   Username x is invalid
+ $SYSTEM.Status.Error($$$PasswordChangeRequired)                 Password change required
+ $SYSTEM.Status.Error($$$UserAccountIsExpired,Username)          User x account has expired
+ $SYSTEM.Status.Error($$$UserAccountIsInactive,Username)         User x account is inactive
+ $SYSTEM.Status.Error($$$UserInvalidPassword)                    Invalid password
+ $SYSTEM.Status.Error($$$ServiceDisabled,ServiceName)            Logins for Service x are disabled
+ $SYSTEM.Status.Error($$$ServiceLoginsDisabled)                  Logins are disabled
+ $SYSTEM.Status.Error($$$ServiceNotAuthorized,ServiceName)       User not authorized for service
+ $SYSTEM.Status.Error($$$UserPasswordInvalidFormat)              Password does not match length or pattern requirements
+ If you wish to generate your own custom message, you can use the following:
+ 
+ $SYSTEM.Status.Error($$$GeneralError,"Any text here")
+ 
+ Note that when an error message is returned to the caller, it is logged in
+ the audit database (if LoginFailure event auditing is turned on.) However,
+ the only error message the user sees is $SYSTEM.Status.Error($$$AccessDenied). However,
+ the user will also see the message for the $$$PasswordChangeRequired error. Return
+ this error if you want the user to change their password. If the user had
+ successfully logged in during a previous attempt, their user record is also updated with
+ the reason for failure along with the date and time of failure and the number of failed
+ login attempts is incremented. The ZAUTHENTICATE routine can use the Security.Users 
+ class and the Security.System class to retrieve any of the user or system settings 
+ such as the number of Invalid Login attempts, Inactive Limit, Invalid Login Limit,
+ Invalid Login Action, and disallow login as desired by returning an error.
+ 
+ If the error $$$PasswordChangeRequired is returned, the following will happen:
+ 
+ 1) If the application is a CSP application, the password change form is displayed.
+ The user will be prompted for the old password, the new password, and to confirm the new password.
+ 
+ 2) If the application is a terminal application, the user will be prompted for a new password
+ and to confirm it.
+ 
+ Once the password is confirmed, the system method
+ 
+ $SYSTEM.Security.ChangePassword(Username,NewPassword,OldPassword,Status) 
+ 
+ is called. This system method detects that the user we are trying to change is a Delegated user,
+ and subsequently calls the user supplied entry point:
+ 
+ ChangePassword^ZAUTHENTICATE(Username,NewPassword,OldPassword,Status) 
+ 
+ This user supplied entry point should update the user's password in the user's delegated user database.
+ After this entry point is called and returns success, the ZAUTHENTICATE routine is called 
+ again with the newly changed password, and authentication proceeds normally. 
+ 
+ On Success, the user can return any or none of the following user properties. 
+ These are used to create or update the user record in the Cache security database
+ for reporting purposes.
+ 
+ The Roles, NameSpace, and Routine variables are also used to set the value of
+ $ROLES for the process in addition to the startup namespace and routine 
+ for terminal access.
+ 
+ Properties() - Array of user properties passed by reference (see notes below):
+   Properties("AutheEnabled") - Bit string enabling two factor authentication
+   Properties("Comment") - Comment
+   Properties("FullName") - Full name of the user
+   Properties("NameSpace") - Default NameSpace for terminal login, e.g. "USER"
+                             NameSpace = "" means use "USER" or "%SYS" 
+                            (note the capital "S" in NameSpace)
+   Properties("Roles")- Comma-separated list of roles, e.g. "%Developer,%Operator"
+   Properties("Routine") - Routine the user runs for terminal access. 
+                           Routine="" means programmer mode
+   Properties("Password") - Password
+   Properties("Username") - Username
+   Properties("EmailAddress") - Email address
+   Properties("PhoneNumber") - Mobile phone number of user for Two Factor Authentication
+   Properties("PhoneProvider") - Phone provider for user's mobile phone
+   Properties("AutheEnabled") - Enable Two Factor Authentication for this login
+   Properties("HOTPKey") - Key for Two factor authentication
+   Properties("HOTPKeyDisplay") - Display QRCode for first login
+ 
+ Notes:
+ 
+ Comment - If the comment property is returned by this function, then that comment
+ is written to the Cache database for the user. If the comment property is not passed 
+ back to the calling routine, then the comment written to the Cache security database
+ will be a null string. Any Cache displays in the system management portal which 
+ examine this field will display a null string.
+ 
+ FullName - If the FullName property is returned by this function, then that FullName
+ is written to the Cache database for the user. If the FullName property is not passed 
+ back to the calling routine, then the FullName written to the Cache security database
+ will be a null string. Any Cache displays in the system management portal which 
+ examine this field will display a null string.
+ 
+ NameSpace - If the NameSpace property is returned by this function, then that NameSpace
+ is written to the Cache database for the user, and any terminal user (telnet, console, etc.)
+ logging into the system will get this namespace as their default namespace. If the 
+ NameSpace property is not passed back to the calling routine, then the NameSpace
+ written to the Cache security database will be a null string. Any terminal user logging into
+ the system with a null namespace will have the following actions:
+ 
+ 1) If the USER namespace exists, the user will be placed in the USER namespace.
+ 2) If the USER namespace does not exist, the user will be placed in the %SYS namespace.
+ 
+ In either case, if the user does not have privilege to be in that namespace, then 
+ the user will be denied access to the system.
+ 
+ Password -  If the password is returned
+ by this function, then it is stored in the security database for the user.
+ This would allow the user to use this password to log into the system using
+ Password authentication if it were enabled. This is a possible mechanism to
+ help migrate from delegated authentication to Password authentication.
+ 
+ Roles - If the Roles property is returned by this function, then those Roles
+ are written to the Cache database for the user, and any user 
+ logging into the system will be granted those roles. If the Roles property is not passed 
+ back to the calling routine, then the Roles written to the Cache security database
+ will be a null string. Setting the Roles to "", or not returning it means that a user 
+ logging into the system will not receive any roles from the user written routine. Their set of 
+ privileges will be governed by what roles they get from the _Public user, and what 
+ resources are set to public.
+ NOTE: If the role(s) returned in the Properties("Roles") parameter are not 
+ defined in the Security database, then the role will not be granted to the user.
+ 
+ Routine - If the Routine property is returned by this function, then that Routine
+ is written to the Cache database for the user, and any terminal user (telnet, console, etc.)
+ logging into the system will execute that routine. If the Routine property is not passed 
+ back to the calling routine, then the routine written to the Cache security database
+ will be a null string. Setting the Routine to "", or not returning it means that a terminal
+ user will enter Cache in programmer mode, subject to whether they have the privilege to
+ access programmer mode or not.
+ 
+ Username -  If the username property is returned by this function, then that username
+ is written to the Cache database. This gives the user a chance to normalize what was 
+ entered by the user at the username prompt. Note that the normalized username must only
+ differ by case. If the Username property is not passed back to the calling routine,
+ then the username entered by the user at the username prompt will be used as
+ the username written to the Cache security databases (i.e. it won't be normalized).
+ 
+ PhoneNumber -  If the PhoneNumber property is returned by this function, then that mobile phone number
+ is written to the Cache database for the user.  If the PhoneNumber property is not passed 
+ back to the calling routine, then the phone number written to the Cache security database
+ will be a null string. If you wish to use Two Factor SMS text authentication with Delegated authentication,
+ then the phone number must be supplied, and must be entered as nothing but numbers (no "()-. ").
+ 
+ PhoneProvider -  If the PhoneProvider property is returned by this function, then that phone provider
+ is written to the Cache database for the user.  If the PhoneProvider property is not passed 
+ back to the calling routine, then the phone provider written to the Cache security database
+ will be a null string. If you wish to use Two Factor SMS text authentication with Delegated authentication,
+ then the phone provider must be supplied.
+ 
+ EmailAddress -  If the EmailAddress property is returned by this function, then that email address
+ is written to the Cache database for the user.  If the EmailAddress property is not passed 
+ back to the calling routine, then the EmailAddress written to the Cache security database
+ will be a null string.
+ 
+ AutheEnabled - This property governs what type of two factor authentication is enabled for
+ the user. If the value is 0, then two factor authentication is not defined for the user.
+ If defined, it is a bit string which can have either or both of the following bits set:
+ 
+ $$$AutheTwoFactorSMS	1048576
+ $$$AutheTwoFactorPW	2097152
+.
+ HOTPKey - If you wish to use Two-factor Time-based One-time Password authentication, then this field
+ must be returned. It must be a 20 character key value. This value should be different for each
+ user, and can be randomly generated by calling the method $System.Encryption.GenCryptRand(20).
+ 
+ HOTPKeyDisplay - If 1 (default), and the user is using Two-factor Time-based One-time Password authentication,
+ then the user will receive their QR Code barcode on the login screen so they can scan the HOTPKey
+ into their authentication device. If 0, then the QR code will not be displayed.
+.
+ Two factor examples:
+ 
+ If you wish to use Two-factor text authentication, you must return the following properties
+ at a minimum:
+.
+ Properties("Roles")
+ Properties("PhoneNumber") - Make sure this is numbers only
+ Properties("PhoneProvider")
+ Properties("AutheEnabled")=$$$AutheTwoFactorSMS  (value=1048576)
+.
+ If you wish to use Time-based One-time Password, you must return the following properties
+ at a minimum:
+ 
+ Properties("Roles")
+ Properties("AutheEnabled")=$$$AutheTwoFactorPW  (value=2097152)
+ Properties("HOTPKey")
+ Properties("HOTPKeyDisplay") - Set to 1 to display QR Code/key to scan on next login,
+ 								0 to not display the key. Typically the first time a user
+ 								logs in, this should be set to 1.
+.
+ */
+ 
+#include %occErrors
+ 
+ //Uncomment out the following line if you wish to use the $$$AutheTwoFactor macros
+ 
+#include %sySecurity
+ 
+ //Uncomment out the following line if you wish to use the predefined
+ //Cache error codes.
+ 
+ //#include %occErrors
+ 
+ //Uncomment out the following line if you wish to use the $$$AutheTwoFactor macro
+ 
+ //#include %sySecurity
+ 
+ //Make sure we have an error trap to handle unexpected errors
+ s $ZT="Error"
+ //Add username/password validation here. The following is some pseudocode
+ //of what you might want to do.
+ //Uppercase the username.
+ ; s Name=$zcvt(Username,"U")
+ //Note that the username passed in may contain the domain. Remove it so we
+ //can compare it against the user defined database
+ ; s Name=$p(Username,"@",1)
+ //Get the user's security record from my own ^USERS global
+ ; s UserRecord=$g(^USERS(Name))
+ //See if he exists, if not return a stock error message
+ ; i UserRecord="" q $SYSTEM.Status.Error($$$UserDoesNotExist,Username)
+ //See if we need to change the password for this user
+ ; i +$p(UserRecord,",",3) q $SYSTEM.Status.Error($$$PasswordChangeRequired)
+ //Now check the password, hopefully it is stored hashed in the users database
+ ; i $SYSTEM.Encryption.SHA1Hash(Password)'=$p(UserRecord,",",1) q $SYSTEM.Status.Error($$$UserInvalidPassword)
+ //Add the followint if this process is to run as the Windows account of this user rather than as the Cache Service account.
+ //See also the delegated authentication sample in the authentication section of the Cache Security Tutorial for an example.
+ //First, call the Logon method
+ ; s domain=$p(Username,"@",2) WinLogonError=$system.Security.Users.LogonUser(Name,$s(domain="":".",1:domain),Password)
+ //Check result
+ ; i WinLogonError q $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)
+ //On success, impersonate that user.
+ ; d $System.Security.Users.ImpersonateUser()
+ //If here, we validated ok. We could also have checked the ServiceName
+ //parameter, or account disabled, or anything we want against our User defined DB.
+ //Return the following properties; They are passed to the Security.Users.Create 
+ //or Security.Users.Modify class.
+ //Full name of the user
+ ;s Properties("FullName")=$p(UserRecord,2)
+ //We don't have a comment
+ ;s Properties("Comment")=""
+ //User process will get the following roles.
+ //Note that if roles are not returned here, the user may get a
+ //lot of <PROTECT> errors logged in the audit log and fail
+ //to log in.
+ ;s Properties("Roles")="%Developer"
+ //A terminal will start in this namespace
+ ;s Properties("NameSpace")="%SYS"
+ //A terminal will run this routine. ""=programmer mode
+ ;s Properties("Routine")=""
+ //Returning the password here will enable the user for
+ //Password authentication if it is enabled for the system,
+ //so make sure we really want to return this.
+ ;s Properties("Password")="SYS"
+ //The name in the security database should be the normalized name,
+ //however you care to normalize it. In this case we uppercased it above.
+ ;s Properties("Username")=Name
+ //If you want to use two factor authentication with Delegated Authentication you must
+ //supply the mobile phone phone number of the user, and their service provider.
+ ;s Properties("PhoneNumber")="999-999-9999"
+ ;s Properties("PhoneProvider")="Verizon"
+ //If you decided that for this user on this login you want to use Two Factor Authentication,
+ //then set the following node:
+ ;s Properties("AutheEnabled")=$$$AutheTwoFactorSMS  /* 1048576 */
+ //if you don't want to be prompted for this user, then set it to 0
+ ;s Properties("AutheEnabled")=0  /* 1048576 */
+ //Return success. For the sample routine, we will actually have a
+ //g Error here so we don't get any successfull logins if Delegated
+ //authentication is turned on by accident
+ s $ZE="No ZAUTHENTICATE routine found" g Error
+ q $SYSTEM.Status.OK()
+Error //Handle any COS errors here
+ //Reset error trap to avoid infinite loop
+ s $zt=""
+ //Return the generalized COS error message #5002
+ q $SYSTEM.Status.Error(5002 /*$$$CacheError*/,$ze)
+ }
+ 
+ /*=======================ENTRY POINT========================
+ This entry point is called when the system method
+   
+	$SYSTEM.Security.ChangePassword(Username,NewPassword,OldPassword,Status)
+	
+ is called, and the username passed into the method is a user who is not
+ set up as a Cache Password User. This includes users who are set up as LDAP or
+ Delegated users. Note that if you have a mixture of user types, you can use the 
+ Security.Users class, and check the Flags property to determine the type of user they are,
+ e.g. LDAP or Delegated.
+ 
+ If the password is successfully changed, the entry point should return 1, and the
+ Status variable should be set to $SYSTEM.Status.OK().
+ 
+ If the password change fails, the entry point should return 0, and the Status variable
+ should be set to some error. See the list above for some predefined error codes.
+ 
+ Note that the password entered is not checked against the system defined password pattern. You
+ must perform any validation of the password here.
+ */
+ChangePassword(Username,NewPassword,OldPassword,Status) Public {
+ s $zt="Error"
+ //Add change password code here. The following is some pseudocode
+ //of what you might want to do.
+ //Uppercase the username.
+ ; s Name=$zcvt(Username,"U")
+ //Note that the username passed in may contain the domain. Remove it so we
+ //can compare it against the user defined database
+ ; s Name=$p(Username,"@",1)
+ //Now get the user record. See what type of user it is
+ ; s Status=##Class(Security.Users).Get(Name,.Properties)
+ ; i Status'=$SYSTEM.Status.OK() q 0
+ ;i $zb(Properties("Flags"),2,1) {
+ // The user is an LDAP user. See the entry point EXAMPLE4^LDAP in
+ // the SAMPLES namespace on how you might want to update an LDAP users password.
+ ;}
+ //If here the user is a delegated user.
+ //Get the user's security record from my own ^USERS global
+ ; s UserRecord=$g(^USERS(Name))
+ //See if he exists, if not return a stock error message
+ ; i UserRecord="" q $SYSTEM.Status.Error($$$UserDoesNotExist,Username)
+ //Now compare the old password to see if we can change it
+ ; i $SYSTEM.Encryption.SHA1Hash(OldPassword)'=$p(UserRecord,",",1) {
+ ;	s Status=$SYSTEM.Status.Error($$$UserInvalidPassword)
+ ;	q 0
+ ; } else {
+ //Make sure the new password is at least 8 characters in length
+ ;	i $l(NewPassword)<8 {
+ ;		s Status=$SYSTEM.Status.Error($$$UserPasswordInvalidFormat)
+ ;		q 0
+ ;	}
+ //We validated the old password, lets change it.
+ ;	s $p(^USERS(Name),",",1)=$SYSTEM.Encryption.SHA1Hash(NewPassword)
+ ;  s Status=$SYSTEM.Status.OK()
+ ;  q 1
+ ;}
+ s Status=$SYSTEM.Status.Error(5002 /*$$$CacheError*/,"No ZAUTHENTICATE routine found")
+ q 0
+Error //Handle any COS errors here
+ //Reset error trap to avoid infinite loop
+ s $zt=""
+ //Return the generalized COS error message #5002
+ s Status=$SYSTEM.Status.Error(5002 /*$$$CacheError*/,$ze)
+ //Return failure
+ q 0
+} 
+ 
+ /*=======================ENTRY POINT========================
+ This entry point is called whenever Delegated authentication for a service is enabled
+ which requires that a username and password be entered. 
+ 
+ This entry point is called before the user is prompted for a username and password. Instead
+ of getting a username and password from the user, the username and password are assigned 
+ by this entry point and returned to the caller. The username and password returned are
+ then authenticated in the normal manner as if the user entered them in the browser or terminal.
+ 
+ The username and password returned from this entry point can be obtained by any mechanism the
+ user chooses; It could be obtained from a global, an external DLL or LDAP call, or simply set right
+ in the routine. If the service is a terminal connection, the user could even do their own
+ prompting for the username/pw combination. (Note that a CSP application would traditionally have
+ their own custom CSP login page defined if they wanted to do their own prompting.)
+ 
+ If an error status is returned by this entry point, then the error is logged in the audit log,
+ and the user is denied access to the system. The one exception to this is if the error status
+ 
+ $SYSTEM.Status.Error($$$GetCredentialsFailed)
+ 
+ is returned, then the normal username/password prompting will be executed.
+ 
+ If a success status is returned by the entry point, but the variables Username and Password
+ are not set, then the user will be denied access to the system, and an error written to the
+ audit log.
+ 
+ If a success status is returned along with the Username and Password, the Username 
+ and Password are then validated using Delegated authentication for the Service. If the
+ Username and Password fail authentication, then the user will be denied access, and the error
+ logged to the audit log.
+ 
+ If the call to this entry point fails because it is either not defined, or there is a PARAMETER 
+ error, or the ZAUTHENTICATE routine does not exist, or there is an unhandled error in the
+ entry point, then then the normal username/password prompting will be executed.
+ 
+ A common use of this mechanism would be to set up your services to use Delegated Authentication,
+ then set some Username and Password here, and then in the ZAUTHENTICATE Delegated authentication 
+ entry point above, set the $roles for the process. 
+ 
+ Parameters:
+  ServiceName - Name of the service the user is connecting to. This 
+                could be %Service_Console, %Service_Bindings, etc.
+  Namespace - Namespace specified as part of the connection string when connecting
+              via the Bindings service, or through a CSP application. If neither of these, then
+              passed in as "".
+  Username (by reference) - Username returned by the function to authenticate against
+           the system security tables.
+  Password (by reference) - Password returned by the function to authenticate against
+           the system security tables.
+  Credentials (by reference) - Not currently used, reserved for future use.
+ 
+ Return values:
+  Success - $SYSTEM.Status.OK() - Username/Password combination returned
+  Failure - $SYSTEM.Status.Error($$$ERRORCODE,Param1,...) - Username/Password combination 
+            not returned.
+  */
+GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
+ s $zt="Error"
+ // The following example sets the processes Username/Password without prompting them
+ // to _SYSTEM/SYS if a console,and Admin/SYS if a telnet user.
+ // If a Bindings service, then we will go through the normal login screen.
+ ; i ServiceName="%Service_Console" {
+ ;		s Username="_SYSTEM"
+ ;		s Password="SYS"
+ ;		q $SYSTEM.Status.OK()
+ ; }
+ ; i ServiceName="%Service_Telnet" {
+ ;		s Username="Admin"
+ ;		s Password="SYS"
+ ;		q $SYSTEM.Status.OK()
+ ; }
+ // For Bindings applications, force them to normally enter a username
+ ; i ServiceName="%Service_Bindings" q $SYSTEM.Status.Error($$$GetCredentialsFailed)
+ // If a CSP application, we can test for a specific application by looking at
+ // the request object. If it exists, then the request is from a CSP application.
+ ;If $isobject($get(%request)) { 
+ ;	if %request.Application="/csp/samples/" {
+ ;		set Username="_SYSTEM"
+ ;		set Password="SYS"
+ ; 		quit $System.Status.OK()
+ ;	}
+ ;}
+ // Here is an example where I get the username and password out of a http request where the password
+ // was set the following way:
+ //	d httpreq.InsertParam("username","TESTDEL") 
+ //	d httpreq.InsertParam("password","SYS") 
+ ;If $isobject($get(%request)) { 
+ ;	if %request.Application="/csp/samples/" {
+ ;		s Username=$get(%request.Data("username",1))
+ ;		s Password=$get(%request.Data("password",1))
+ ;		quit $System.Status.OK()
+ ;	}
+ ;}
+ // For any other service, deny them access
+ ;q $SYSTEM.Status.Error($$$AccessDenied)
+ // By default, we allow the system to do its normal Username/Password prompting.
+ q $SYSTEM.Status.Error(1419 /*$$$GetCredentialsFailed*/)
+Error //Handle any COS errors here
+ //Reset error trap to avoid infinite loop
+ s $zt=""
+ //Return the generalized COS error message #5002
+ q $SYSTEM.Status.Error(5002 /*$$$CacheError*/,$ze)
+}
+ 
+ /*=======================ENTRY POINT========================
+ SendTwoFactorToken(Username,ServiceName,Namespace,Application,Credentials,SecurityToken,TwoFactorTimeout,UserPhoneNumber) 
+ This function creates a new security token, and sends it to the mobile phone of 
+ the user. The security token is returned to the caller along with the two-factor timeout duration
+ and User's phone number. This function is always called when Two Factor Authentication is enabled
+ for a service.
+ Input parameters:
+    Username - name of user being sent the security token
+    ServiceName - Name of the service the user is logging in on
+    Namespace - namespace the user will be in
+    Application - CSP Application or routine the user will be running
+    Credentials - Not currently used
+    SecurityToken - (byRef) the sent security token
+    TwoFactorTimeout - (byRef) The timeout duration before the security token expires
+    PhoneNumber - (byRef) Phone number of the user. A value for this must be returned, or ""
+ Return value:  Status
+ 
+ Notes: This sample SendTwoFactorToken() code will send the same message to a mobile phone as the
+ system default. The parameters Username, Servicename, Namespace, and Application may be examined, 
+ and their values used to modify the message sent to the mobile phone.
+ If the service is %Service_CSP, the Application will be in the form "/csp/appname/". If the service is
+ %Service_Console or %Service_Telnet, the Application will be in the form "Tag^Routine". If the service 
+ is %Service_Bindings, then the application will be an executable name like "ODBC.EXE".
+ 
+ This code is called during login while the process has the %All privilege, and is in the %SYS namespace.
+ $username is set to the username the user has entered, and the password has been validated.
+ 
+ */
+ /* REMOVE THIS COMMENT HERE TO ENABLE THE SendTwoFactorToken CODE
+#include %occInclude
+SendTwoFactorToken(Username,ServiceName,Namespace,Application,Credentials,SecurityToken,TwoFactorTimeout,UserPhoneNumber="") Public {
+ s $zt="Error"
+ //We must own the %Admin_Security:Use resource to run this
+ i '$SYSTEM.Security.Check($$$AdminSecureResourceName,$$$PermUseName) q $$$ERROR($$$OperationRequires,$$$AdminSecureResourceName_":"_$$$PermUseName)
+ // First get the user properties, and the phone provider info , and make sure they are set to something valid
+ // Note that this was set into the user record by the Properties() array returned by the ZAUTHENTICATE record above.
+ s Status=##Class(Security.Users).Get(Username,.UserProperties)
+ i Status'=$SYSTEM.Status.OK() q Status
+ i UserProperties("PhoneNumber")="" quit $$$ERROR($$$TwoFactUserNotConfig,Username)
+ // Make sure the phone number is returned
+ s UserPhoneNumber=UserProperties("PhoneNumber")
+ i UserProperties("PhoneProvider")="" quit $$$ERROR($$$TwoFactUserNotConfig,Username)	
+ s Status=##class(%SYS.PhoneProviders).Get(UserProperties("PhoneProvider"),.ProviderProperties)
+ i Status'=$SYSTEM.Status.OK() q Status
+ s Status=##Class(Security.System).Get("SYSTEM",.SystemProperties)
+ i Status'=$SYSTEM.Status.OK() q Status
+ // Now set up the SMTP authentication
+ s SMTP=##class(%Net.SMTP).%New()
+ i '$isobject(SMTP) q %objlasterror
+ i $l(SystemProperties("SMTPUsername"))&&$l(SystemProperties("SMTPPassword")) {
+	s Auth=##class(%Net.Authenticator).%New()
+	i '$isobject(Auth) q %objlasterror
+	s Auth.UserName=SystemProperties("SMTPUsername")
+	s Auth.Password=SystemProperties("SMTPPassword")
+	s SMTP.authenticator=Auth
+ }
+ s SMTP.smtpserver=SystemProperties("SMTPServer")
+ s Message=##class(%Net.MailMessage).%New()
+ i '$isobject(Message) q %objlasterror
+ s Message.From=SystemProperties("TwoFactorFrom")
+ d Message.To.Insert(UserProperties("PhoneNumber")_"@"_ProviderProperties("SMSGateway"))
+ s SecurityToken=$System.Encryption.GenCryptToken()
+ s TwoFactorTimeout=SystemProperties("TwoFactorTimeout")
+ s Message.Charset="iso-8859-1"
+ // Here is where you may want to test the passed parameters, and modify the
+ // text message sent to the user. For example
+ // i Namespace="BANKING" {
+ // 	s TwoFactorTimeout=600 ; Set timeout to 10 minutes
+ //		s Message.Subject=""
+ //		s Text="Bank of MyBank Security Token is: "_SecurityToken
+ // 	s Text=Text_" Your Security Token is good for "_(TwoFactorTimeout/60)_" minutes. "
+ // 	s Text=Text_"Do not respond to this message."
+ // 	d Message.TextData.Write(Text)
+ // } 
+ s Message.Subject="Security Token"
+ d Message.TextData.Write(SecurityToken)
+ q SMTP.Send(Message)
+Error //Handle any COS errors here
+ //Reset error trap to avoid infinite loop
+ s $zt=""
+ //Return the generalized COS error message #5002
+ q $SYSTEM.Status.Error(5002,$ze)
+}
+ */
+///////////////////////////////////////////////////////////////////////////////////
+ //Below is an example of how you might want to write an authentication routine
+ //using LDAP class methods to authenticate from a windows client to a 
+ //Windows Active Directory server.
+ // See also LDAP.MAC in the SAMPLES namespace for several additional LDAP examples.
+ ///////////////////////////////////////////////////////////////////////////////////
+ 
+ //#include %syLDAP
+ //#include %occErrors 
+ //Make sure we have an error trap to handle unexpected errors
+ //s $ZT="Error"
+ 
+ //Connect to the LDAP server
+ //s LDAPServer="ldapserver.example.com"
+ //s LD=##Class(%SYS.LDAP).Init(LDAPServer)
+ //i LD=0 {
+ //	 s Status=##Class(%SYS.LDAP).GetLastError()
+ //	 g Error
+ //}
+ 
+ //Authenticate the passed in user by using the Binds command 
+ //s Domain="example.com"
+ //s Status=##Class(%SYS.LDAP).Binds(LD,"",$lb(Username,Domain,Password),$$$LDAPAUTHNEGOTIATE)
+ //i Status'=$$$LDAPSUCCESS q $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)
+ 
+ //Ok, now lets search for that user, and get their attributes.
+ //The search will only work if the authenticated user passed in has read
+ //access to the LDAP server.
+ //sAMAccountname is the unique identifier for a windows active directory
+ //LDAP server.
+ //s BaseDN="dc=DEVCON,dc=local"
+ //s Filter="sAMAccountname="_Username
+ //s Attributes=$lb("sAMAccountname","iscRoles","iscNamespace","displayName","telephoneNumber","description","mail")
+ //s Status=##Class(%SYS.LDAP).SearchExts(LD,BaseDN,$$$LDAPSCOPESUBTREE,Filter,Attributes,0,"","",10,1,.SearchResult)
+ //i Status'=$$$LDAPSUCCESS g Error
+ 
+ //Now get a pointer to the search result set
+ //s CurrentEntry=##Class(%SYS.LDAP).FirstEntry(LD,SearchResult)
+ //i CurrentEntry=0 g Error
+ 
+ //Now get all the returned attribute names and their values
+ //s Attribute=##Class(%SYS.LDAP).FirstAttribute(LD,CurrentEntry,.Ptr)
+ //while (Attribute'="") {
+ // 	s Values=##Class(%SYS.LDAP).GetValuesLen(LD,CurrentEntry,Attribute)
+ //Place the values in the Properties() variable to return to caller
+ //		s Properties("Attributes",Attribute)=Values
+ //		s Attribute=##Class(%SYS.LDAP).NextAttribute(LD,CurrentEntry,.Ptr)
+ //}
+ 
+ //Now return the other user properties, and remove them from the list of
+ //attributes so they don't get stored twice
+ //s Properties("Username")=$li(Properties("Attributes","sAMAccountName"))
+ //k Properties("Attributes","sAMAccountName")
+ //s Properties("FullName")=$li(Properties("Attributes","displayName"))
+ //k Properties("Attributes","displayName")
+ //s Properties("Comment")=$li(Properties("Attributes","description")) 
+ //k Properties("Attributes","description")
+ //s Properties("NameSpace")=$li(Properties("Attributes","iscNamespace")) 
+ //k Properties("Attributes","iscNamespace")
+ //f i=1:1:$ll(Properties("Attributes","iscRoles")) {
+ //		s Properties("Roles")=$li(Properties("Attributes","iscRoles"),i)_","
+ //}
+ //s Properties("Roles")=$e(Properties("Roles"),1,*-1)
+ //k Properties("Attributes","iscRoles")
+ 
+ //Done
+ //i $d(LD) s Status=##Class(%SYS.LDAP).UnBinds(LD)
+ //q $SYSTEM.Status.OK()
+ 
+ //Error s $zt=""
+ //i +$d(LD) s Status=##Class(%SYS.LDAP).UnBinds(LD)
+ //i $ze'="" {
+ //	q $SYSTEM.Status.Error($$$CacheError,$ze)
+ // } else{	 
+ //	q $SYSTEM.Status.Error($$$GeneralError,"LDAP error: "_Status_" - "_##Class(%SYS.LDAP).Err2String(Status))
+ //}
+ //}
+ 
+
+
+
