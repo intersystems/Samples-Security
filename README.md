@@ -38,8 +38,8 @@ Setup instructions
 2. Open the InterSystems IRIS Terminal.
 3. Enter the following command (replacing with the namespace where you want to load the sample):
    ZN "mynamespace"
-4. Enter the following commands (replacing with the full path of the buildsample/buildsamplesecurity.rtn file):
-   do $system.OBJ.Load("full-path-to-buildsamplesecurity.rtn","ck")
+4. Enter the following commands (replacing with the full path of the buildsample/buildsamplesecurity.mac file):
+   do $system.OBJ.Load("full-path-to-buildsamplesecurity.mac","ck")
    do ^buildsamplesecurity
 5. Then answer any prompts.
 
