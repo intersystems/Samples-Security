@@ -6,7 +6,7 @@ ROUTINE buildsamplesecurity
     write !, "sample security routines for with InterSystems IRIS Data Platform."
     write !
 
-    write !, "Please specify the afull path of the directory that contains this sample."
+    write !, "Please specify the full path of the directory that contains this sample."
     write !, "(This is the directory that contains the README.md and LICENSE files.)", !
     read stagingroot
     set OK=$$run(stagingroot,1)
