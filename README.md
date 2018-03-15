@@ -40,10 +40,10 @@ routines that you can copy and modify for specific purposes.
 ```
    ZN "mynamespace"
 ```
-5. Enter the following commands (replacing with the full path of the `buildsample/buildsamplesecurity.mac` file):
+5. Enter the following commands (replacing with the full path of the `buildsample/Build.SecuritySample.cls` file):
 ```
-   do $system.OBJ.Load("full-path-to-buildsamplesecurity.mac","ck")
-   do ^buildsamplesecurity
+   do $system.OBJ.Load("full-path-to-Build.SecuritySample.cls","ck")
+   do ##class(Build.SecuritySample).Build()
 ```
-6. Then answer any prompts.
+6. When prompted, enter the full path of the directory to which you downloaded this sample. The method then loads the sample code, but does not compile it.
 
