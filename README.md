@@ -34,8 +34,8 @@ routines that you can copy and modify for specific purposes.
 *  `REST.ZAUTHENTICATE.mac` is another sample routine that demonstrates how to authenticate a REST application using OAuth 2.0. To use this sample:
     1. Configure the resource server containing the REST application as an OAuth 2.0 resource server.
     2. Copy this routine to the %SYS namespace as ZAUTHENTICATE.mac.
-    3. Modify value of applicationName in ZAUTHENTICATE.mac
-    4. Allow delegated authentication for %Service.CSP
+    3. Modify value of applicationName in ZAUTHENTICATE.mac.
+    4. Allow delegated authentication for %Service.CSP.
     5. Make sure that the web application for the REST application is using delegated authentication.
 
 
