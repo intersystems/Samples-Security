@@ -16,87 +16,87 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	// based on OAuth 2.0 by modifying this routine, copying it to %SYS namespace and renaming to ZAUTHENTICATE.mac.<br><br>
 	//
 	// Usually you will need to modify at least the roles to be assigned.
-	Set roles="%DB_DEFAULT,%Operator"
+	set roles="%DB_DEFAULT,%Operator"
 	
 	$$$SysLog(3,"OAuth2","[ZAUTHENTICATE]","ServiceName="_ServiceName_", Username="_Username_", roles="_roles)
  
-	Set loginSuccessful=0
-	Set errorText=""
-	Try {		
-		If ServiceName="%Service_CSP" {
+	set loginSuccessful=0
+	set errorText=""
+	try {		
+		if ServiceName="%Service_CSP" {
 			// Pickup state that was added to redirect URL
-			Set state=$get(%request.Data($parameter("%OAuth2.Login","SessionQueryParameter"),1))
+			set state=$get(%request.Data($parameter("%OAuth2.Login","SessionQueryParameter"),1))
  
 			// This ZAUTHENTICATE routine will support login using either 
 			// an OAuth 2.0 login page which is a subclass of %OAuth2.Login or
 			// having the user page call %session.Login after the access token has been obtained.
- 			If Username="OAuth2",Password=$c(1,2,3) {
+ 			if Username="OAuth2",Password=$c(1,2,3) {
 	 			// Authentication is via a subclass of %OAuth2.Login that sets the query parameter CSPOAUTH2
 				// with a hash value that allows GetCurrentApplication to determine the application -- 
 				// username/password is supplied by GetCredentials.
-				Set sc=##class(OAuth2.Response).GetCurrentApplication(.applicationName)
-				Set sessionId=%session.SessionId
- 			} Else {
+				set sc=##class(OAuth2.Response).GetCurrentApplication(.applicationName)
+				set sessionId=%session.SessionId
+ 			} else {
 	 			// If authentication is based on %session.Login, then application and session id are passed in.
-	 			Set applicationName=Username
-				Set sessionId=Password
+	 			set applicationName=Username
+				set sessionId=Password
  			}
 			$$$SysLog(3,"OAuth2","[ZAUTHENTICATE]","state="_state_", session="_sessionId)
  
-			If applicationName'="" {
+			if applicationName'="" {
 				// Check if authorized
-				Set isAuthorized=##class(%SYS.OAuth2.AccessToken).IsAuthorized(applicationName,sessionId,,.accessToken,,,.error)
-				If isAuthorized {
+				set isAuthorized=##class(%SYS.OAuth2.AccessToken).IsAuthorized(applicationName,sessionId,,.accessToken,,,.error)
+				if isAuthorized {
 					// We need to obtain a user name in any way appropriate to the application.  Examples are:<br>
 					// from JWT if access token is a JWT using ##class(%SYS.OAuth2.Validate).ValidateJWT,<br>
 					// from IDToken if OpenID Connect using ##class(%SYS.OAuth2.Validate).ValidateIDToken,<br>
 					// from Userinfo endpoint if OpenID Connect using ##class(%SYS.OAuth2.AccessToken).GetUserinfo or<br>
 					// from introspection endpoint using ##class(%SYS.OAuth2.AccessToken).GetIntrospection.<br>
 					// This example uses the sub property which is returned by the introspection endpoint.
-					Set sc=##class(%SYS.OAuth2.AccessToken).GetIntrospection(applicationName,accessToken,.jsonObject)
-					If $$$ISERR(sc) {
-						Set errorText=$system.Status.GetErrorText(sc)
-						Quit
+					set sc=##class(%SYS.OAuth2.AccessToken).GetIntrospection(applicationName,accessToken,.jsonObject)
+					if $$$ISERR(sc) {
+						set errorText=$system.Status.GetErrorText(sc)
+						quit
 					}
  
 					// Setup the new user.
 					// Note that the user must not be a normal Cache user
 					// in order to allow creation or update of the delegated user.
-					Set loginSuccessful=1
-					Set Username="OAuth2"_jsonObject.sub
-					Set Properties("FullName")="OAuth account "_Username
-					Set Properties("Username")=Username
-					Set Properties("Password")=""	// we don't really care about oauth2 account password
+					set loginSuccessful=1
+					set Username="OAuth2"_jsonObject.sub
+					set Properties("FullName")="OAuth account "_Username
+					set Properties("Username")=Username
+					set Properties("Password")=""	// we don't really care about oauth2 account password
  
 					// Set the roles and other Properties as appropriate.
-					Set Properties("Roles")=roles
+					set Properties("Roles")=roles
  
-				} ElseIf $isobject(error) {
-					Set errorText=error.AsString()
+				} elseif $isobject(error) {
+					set errorText=error.AsString()
 				}
 			}
 		}
 	} Catch (ex) {
-		Set errorText=ex.DisplayString()
+		set errorText=ex.DisplayString()
 	}
  
-	If loginSuccessful {
+	if loginSuccessful {
 		$$$SysLog(3,"OAuth2","[ZAUTHENTICATE]","user="_Username)
-		Set sc=$$$OK
-	} Else {
+		set sc=$$$OK
+	} else {
 		$$$SysLog(3,"OAuth2","[ZAUTHENTICATE]","error="_$select(errorText'="":errorText,1:"Access Denied"))
-		Set sc=$$$ERROR($$$AccessDenied)
+		set sc=$$$ERROR($$$AccessDenied)
 	}
  
-	Quit sc
+	quit sc
 }
 GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
-	If ServiceName="%Service_CSP" {
+	if ServiceName="%Service_CSP" {
 		// Supply user name and password for authentication via a subclass of %OAuth2.Login
-		Set Username="OAuth2"
-		Set Password=$c(1,2,3)
+		set Username="OAuth2"
+		set Password=$c(1,2,3)
 	}
-	Quit $$$OK
+	quit $$$OK
 }
  
  
