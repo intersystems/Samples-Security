@@ -645,7 +645,10 @@ Error //Handle any COS errors here
  //Authenticate the passed in user by using the Binds command 
  //s Domain="example.com"
  //s Status=##Class(%SYS.LDAP).Binds(LD,"",$lb(Username,Domain,Password),$$$LDAPAUTHNEGOTIATE)
- //i Status'=$$$LDAPSUCCESS q $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)
+ //i Status'=$$$LDAPSUCCESS {
+ //  i $d(LD) s Status=##Class(%SYS.LDAP).UnBinds(LD)
+ //  q $SYSTEM.Status.Error($$$InvalidUsernameOrPassword)
+ //}
  
  //Ok, now lets search for that user, and get their attributes.
  //The search will only work if the authenticated user passed in has read
