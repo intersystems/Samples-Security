@@ -25,7 +25,7 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	set loginSuccessful=0
 	set errorText=""
 	try {		
-		if (ServiceName="%Service_CSP") && (Username="OAuth2") && (Password=$c(1,2,3)){
+		if (ServiceName="%Service_WebGateway") && (Username="OAuth2") && (Password=$c(1,2,3)){
 			// This ZAUTHENTICATE routine will support OAuth 2.0 based
 			// delegated authentication for subclasses of %CSP.REST.
 			set accessToken=##class(%SYS.OAuth2.AccessToken).GetAccessTokenFromRequest(.sc)
@@ -76,7 +76,7 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	quit sc
 }
 GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
-	if ServiceName="%Service_CSP" {
+	if ServiceName="%Service_WebGateway" {
 		// Supply user name and password for authentication via a subclass of %CSP.REST
 		set Username="OAuth2"
 		set Password=$c(1,2,3)
