@@ -28,8 +28,6 @@ routines that you can copy and modify for specific purposes.
 * `OAUTH2.ZAUTHENTICATE.mac` is another sample routine that helps you define delegated 
   authentication, in this case, specifically for use within the OAuth 2.0 framework.
   Copy and modify this sample to create your own `ZAUTHENTICATE` routine, as described in [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GOAUTH_client#GOAUTH_client_delauthe_zauthenticate).
-
-  For details on this particular sample routine, see [this page](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GOAUTH_client_delauthe_sampleroutine).
   
 *  `REST.ZAUTHENTICATE.mac` is another sample routine that demonstrates how to authenticate a REST application using OAuth 2.0. To use this sample:
     1. Configure the resource server containing the REST application as an OAuth 2.0 resource server.
