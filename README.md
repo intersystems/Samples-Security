@@ -15,19 +15,19 @@ routines that you can copy and modify for specific purposes.
 
 * `ZAUTHENTICATE.mac` is a sample routine that you helps you define delegated (user-defined) 
   authentication. Copy and modify this sample to create your own `ZAUTHENTICATE`
-  routine. For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GCAS_delegated).
+  routine. For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GAUTHN_delegated).
 
 * `ZAUTHORIZE.mac` is a sample routine that you helps you define delegated (user-defined) 
   authorization. Copy and modify this sample to create your own `ZAUTHORIZE`
-  routine. For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GCAS_delegauthz).
+  routine. For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GAUTHZ_delegauthz).
 
 * `LDAP.mac` demonstrates calls to the `%SYS.LDAP` class, which you would use as part of
   delegated authentication, in cases when you want to authenticate using the LDAP server.
-  For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GCAS_LDAP_overview).
+  For details, see [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GAUTHN_delegated#GAUTHN_ldap_authz).
 
 * `OAUTH2.ZAUTHENTICATE.mac` is another sample routine that helps you define delegated 
   authentication, in this case, specifically for use within the OAuth 2.0 framework.
-  Copy and modify this sample to create your own `ZAUTHENTICATE` routine, as described in [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GOAUTH_client_delauthe).
+  Copy and modify this sample to create your own `ZAUTHENTICATE` routine, as described in [documentation](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GOAUTH_client#GOAUTH_client_delauthe_zauthenticate).
 
   For details on this particular sample routine, see [this page](http://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GOAUTH_client_delauthe_sampleroutine).
   
