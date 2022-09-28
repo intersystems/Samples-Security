@@ -466,8 +466,8 @@ Error //Handle any COS errors here
  logged to the audit log.
  
  If the call to this entry point fails because it is either not defined, or there is a PARAMETER 
- error, or the ZAUTHENTICATE routine does not exist, or there is an unhandled error in the
- entry point, then then the normal username/password prompting will be executed.
+ error, or the ZAUTHENTICATE routine does not exist, then then the normal username/password 
+ prompting will be executed.
  
  A common use of this mechanism would be to set up your services to use Delegated Authentication,
  then set some Username and Password here, and then in the ZAUTHENTICATE Delegated authentication 
