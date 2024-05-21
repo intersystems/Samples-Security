@@ -91,7 +91,7 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	quit sc
 }
 GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
-	if ServiceName="%Service_WebGateway" {
+	if ServiceName="%Service_WebGateway", $data(%request.Data(##class(%OAuth2.Login).#SessionQueryParameter)) {
 		// Supply user name and password for authentication via a subclass of %OAuth2.Login
 		set Username="OAuth2"
 		set Password=$c(1,2,3)
