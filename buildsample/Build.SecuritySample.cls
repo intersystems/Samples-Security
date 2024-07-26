@@ -61,10 +61,10 @@ ClassMethod run(stagingroot As %String = "", interactive As %Boolean = 0)
         }
         return 0
     }
-    do $system.OBJ.Load(dir_"ldap.mac","k",,1)
+    do $system.OBJ.Load(dir_"LDAP.mac","k",,1)
     do $system.OBJ.Load(dir_"OAUTH2.ZAUTHENTICATE.mac","k",,1)
-    do $system.OBJ.Load(dir_"zauthenticate.mac","k",,1)
-    do $system.OBJ.Load(dir_"zauthorize.mac","k",,1)
+    do $system.OBJ.Load(dir_"ZAUTHENTICATE.mac","k",,1)
+    do $system.OBJ.Load(dir_"ZAUTHORIZE.mac","k",,1)
     do $system.OBJ.Load(dir_"REST.ZAUTHENTICATE.mac","k",,1)
     return 1
 }
