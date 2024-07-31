@@ -10,7 +10,8 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
  
 	// Sample ZAUTHENTICATE for delegated authentication based on OAuth 2.0 use of login page or %session.Login.
 	// Use of %OAuth2.Login subclass for delegated authentication will result in called ZAUTHENTICATE with
-	// query parameter CSPOAUTH2 = to the state value for the authorization request.<br><br>
+	// query parameter CSPOAUTH2 = to the state value for the authorization request. The state value is passed to 
+	// the sample ZAUTHENTICATE through Password.<br><br>
 	//
 	// This ZAUTHENTICATE may be used as a model for the ZAUTHENTICATE used to do delegated authentication
 	// based on OAuth 2.0 by modifying this routine, copying it to %SYS namespace and renaming to ZAUTHENTICATE.mac.<br><br>
@@ -25,12 +26,16 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	try {		
 		if ServiceName="%Service_WebGateway" {
 			// Pickup state that was added to redirect URL
-			set state=$get(%request.Data($parameter("%OAuth2.Login","SessionQueryParameter"),1))
+			// Sample ZAUTHENTICATE has the state value passed in through Password
+			// This could also be written as: 
+			//// set state=$get(%request.Data(##class(%OAuth2.Login).#SessionQueryParameter,1))
+			set state=Password
+			Set HashedToken = $zcrc(state,7) 
  
 			// This ZAUTHENTICATE routine will support login using either 
 			// an OAuth 2.0 login page which is a subclass of %OAuth2.Login or
 			// having the user page call %session.Login after the access token has been obtained.
- 			if Username="OAuth2",Password=$c(1,2,3) {
+ 			if Username="OAuth2"_HashedToken{
 	 			// Authentication is via a subclass of %OAuth2.Login that sets the query parameter CSPOAUTH2
 				// with a hash value that allows GetCurrentApplication to determine the application -- 
 				// username/password is supplied by GetCredentials.
@@ -91,10 +96,12 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	quit sc
 }
 GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
-	if ServiceName="%Service_WebGateway", $data(%request.Data(##class(%OAuth2.Login).#SessionQueryParameter)) {
+	if ServiceName="%Service_WebGateway", $data(%request.Data(##class(%OAuth2.Login).#SessionQueryParameter),state) {
 		// Supply user name and password for authentication via a subclass of %OAuth2.Login
-		set Username="OAuth2"
-		set Password=$c(1,2,3)
+		Set HashedToken = $zcrc(state,7) 
+		set Username="OAuth2"_HashedToken
+		// Pass state as password to save ourselves a lookup in ZAUTHENTICATE
+		set Password=state
 	}
 	quit $$$OK
 }
