@@ -1,3 +1,4 @@
+ROUTINE REST.ZAUTHENTICATE
 ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Properties) Public
 {
 #include %occErrors
@@ -34,7 +35,11 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 			// if the access token is not a JWT, we would need to validate the access token
 			// using another means such as the introspection or userinfo endpoint.
 			if $$$ISOK(sc) {
-				set valid=##class(%SYS.OAuth2.Validation).ValidateJWT(applicationName,accessToken,,,.jsonObject,,.sc)
+				set valid=##class(%SYS.OAuth2.Validation).ValidateJWT(applicationName,accessToken,,,.jsonObject,.securityParams,.sc)
+				set isTokenSigned = $Data(securityParams("sigalg"))#2
+				if 'isTokenSigned {
+					$$$ThrowStatus($System.Status.Error($$$AccessDenied))
+				}
 			}
 			
 			if valid {
@@ -53,10 +58,10 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 				set Properties("FullName")="OAuth account "_Username
 				set Properties("Username")=Username
 				set Properties("Password")=""	// we don't really care about oauth2 account password
-.
+
 				// Set the roles and other Properties as appropriate.
 				set Properties("Roles")=roles
-.
+
 			} else {
 				set errorText=$system.Status.GetErrorText(sc)
 			}
