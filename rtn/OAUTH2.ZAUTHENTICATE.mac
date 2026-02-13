@@ -96,12 +96,16 @@ ZAUTHENTICATE(ServiceName, Namespace, Username, Password, Credentials, Propertie
 	quit sc
 }
 GetCredentials(ServiceName,Namespace,Username,Password,Credentials) Public {
-	if ServiceName="%Service_WebGateway", $data(%request.Data(##class(%OAuth2.Login).#SessionQueryParameter),state) {
-		// Supply user name and password for authentication via a subclass of %OAuth2.Login
-		Set HashedToken = $zcrc(state,7) 
-		set Username="OAuth2"_HashedToken
-		// Pass state as password to save ourselves a lookup in ZAUTHENTICATE
-		set Password=state
+	if ServiceName="%Service_WebGateway" {
+		set sessionQueryParameter = ##class(%OAuth2.Login).#SessionQueryParameter
+		set state = $get(%request.Data(sessionQueryParameter,1))
+		if state '= "" {
+			// Supply user name and password for authentication via a subclass of %OAuth2.Login
+			Set HashedToken = $zcrc(state,7) 
+			set Username="OAuth2"_HashedToken
+			// Pass state as password to save ourselves a lookup in ZAUTHENTICATE
+			set Password=state
+		}
 	}
 	quit $$$OK
 }
